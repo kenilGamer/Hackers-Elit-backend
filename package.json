@@ -1,0 +1,26 @@
+{
+  "name": "server",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "@tensorflow/tfjs-node": "^4.20.0",
+    "axios": "^1.7.7",
+    "cors": "^2.8.5",
+    "express": "^4.19.2",
+    "glob": "^11.0.0",
+    "lru-cache": "^11.0.0",
+    "mongoose": "^8.6.0",
+    "multer": "^1.4.5-lts.1",
+    "node-webcam": "^0.8.2",
+    "npmlog": "^7.0.1",
+    "papaparse": "^5.4.1",
+    "sharp": "^0.33.5"
+  }
+}
