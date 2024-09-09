@@ -4,7 +4,6 @@ const multer = require('multer');
 const sharp = require('sharp');
 const axios = require('axios');
 const FormData = require('form-data');
-const fs = require('fs');
 const path = require('path');
 
 const app = express();
@@ -26,7 +25,7 @@ const upload = multer({
   }
 });
 
-// Example route to handle image uploads
+// Route to handle image uploads
 app.post('/upload', upload.single('image'), async (req, res) => {
   try {
     if (!req.file) {
@@ -39,11 +38,16 @@ app.post('/upload', upload.single('image'), async (req, res) => {
     // Call Plant.id API
     const result = await callPlantIdAPI(processedImage);
 
+    if (result.error) {
+      return res.status(500).json({ error: result.error });
+    }
+
     // Example response object based on API output
     const response = {
       plantName: result.plantName || 'Unknown',
       disease: result.disease || 'Unknown',
-      confidence: result.confidence || 'N/A'
+      confidence: result.confidence || 'N/A',
+      additionalInfo: result.additionalInfo || 'No additional info available'
     };
 
     res.json(response);
@@ -53,11 +57,11 @@ app.post('/upload', upload.single('image'), async (req, res) => {
   }
 });
 
-// Function to call Plant.id API
+// Function to call Plant.id API v3
 const callPlantIdAPI = async (imageBuffer) => {
   try {
-    const apiEndpoint = 'https://api.plant.id/v2/plant-identification';
-    const apiKey = 'YOUR_API_KEY'; // Replace with your actual API key
+    const apiEndpoint = 'https://api.plant.id/v3/plant-identification'; // Updated endpoint
+    const apiKey = 'nIHfGmmzcYS5oKoGUb1i2GxAXcYUX0UsNjutoqp4srCed3yI0d'; // Replace with your actual API key
 
     const formData = new FormData();
     formData.append('images', imageBuffer, { filename: 'image.png' });
@@ -69,10 +73,26 @@ const callPlantIdAPI = async (imageBuffer) => {
       }
     });
 
-    return response.data;
+    // Check if response is successful
+    if (response.status !== 200) {
+      throw new Error(`API returned status code ${response.status}`);
+    }
+
+    // Process API response
+    const data = response.data;
+    if (!data || data.error) {
+      throw new Error(data.error || 'Unknown error');
+    }
+
+    return {
+      plantName: data.suggestions[0]?.plant_name || 'Unknown',
+      disease: data.suggestions[0]?.disease || 'Unknown',
+      confidence: data.suggestions[0]?.confidence || 'N/A',
+      additionalInfo: data.suggestions[0]?.additional_info || 'No additional info available'
+    };
   } catch (error) {
     console.error('Error calling Plant.id API:', error.message || error);
-    throw new Error('Error calling Plant.id API');
+    return { error: 'Error calling Plant.id API' };
   }
 };
 
