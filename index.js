@@ -26,74 +26,73 @@ const upload = multer({
 });
 
 // Route to handle image uploads
-app.post('/upload', upload.single('image'), async (req, res) => {
-  try {
-    if (!req.file) {
-      return res.status(400).json({ error: 'No file uploaded' });
-    }
+app.post('/upload', upload.single('image'), (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ error: 'No file uploaded' });
+  }
 
-    // Process the image
-    const processedImage = await sharp(req.file.buffer).toBuffer();
+  // Process the image with Sharp 
+  sharp(req.file.buffer).toBuffer((err, processedImage) => {
+    if (err) {
+      console.error('Error processing image:', err);
+      return res.status(500).json({ error: 'Error processing image' });
+    }
 
     // Call Plant.id API
-    const result = await callPlantIdAPI(processedImage);
+    callPlantIdAPI(processedImage, (apiErr, result) => {
+      if (apiErr) {
+        console.error('Error calling Plant.id API:', apiErr);
+        return res.status(500).json({ error: apiErr.message });
+      }
 
-    if (result.error) {
-      return res.status(500).json({ error: result.error });
-    }
+      // Example response object based on API output
+      const response = {
+        plantName: result.plantName || 'Unknown',
+        disease: result.disease || 'Unknown',
+        confidence: result.confidence || 'N/A',
+        additionalInfo: result.additionalInfo || 'No additional info available'
+      };
 
-    // Example response object based on API output
-    const response = {
-      plantName: result.plantName || 'Unknown',
-      disease: result.disease || 'Unknown',
-      confidence: result.confidence || 'N/A',
-      additionalInfo: result.additionalInfo || 'No additional info available'
-    };
-
-    res.json(response);
-  } catch (error) {
-    console.error('Error processing image:', error.message || error);
-    res.status(500).json({ error: 'Internal Server Error' });
-  }
+      res.json(response);
+    });
+  });
 });
 
-// Function to call Plant.id API v3
-const callPlantIdAPI = async (imageBuffer) => {
-  try {
-    const apiEndpoint = 'https://api.plant.id/v3/plant-identification'; // Updated endpoint
-    const apiKey = 'nIHfGmmzcYS5oKoGUb1i2GxAXcYUX0UsNjutoqp4srCed3yI0d'; // Replace with your actual API key
+// Function to call Plant.id API v3 with callback
+const callPlantIdAPI = (imageBuffer, callback) => {
+  const apiEndpoint = 'https://api.plant.id/v3/'; // Updated endpoint
+  const apiKey = 'nIHfGmmzcYS5oKoGUb1i2GxAXcYUX0UsNjutoqp4srCed3yI0d'; // Replace with your actual API key
 
-    const formData = new FormData();
-    formData.append('images', imageBuffer, { filename: 'image.png' });
+  const formData = new FormData();
+  formData.append('images', imageBuffer, { filename: 'image.png' });
 
-    const response = await axios.post(apiEndpoint, formData, {
-      headers: {
-        ...formData.getHeaders(),
-        'Api-Key': apiKey
-      }
-    });
-
-    // Check if response is successful
+  axios.post(apiEndpoint, formData, {
+    headers: {
+      ...formData.getHeaders(),
+      'Api-Key': apiKey
+    }
+  })
+  .then(response => {
     if (response.status !== 200) {
-      throw new Error(`API returned status code ${response.status}`);
+      return callback(new Error(`API returned status code ${response.status}`));
     }
 
-    // Process API response
     const data = response.data;
     if (!data || data.error) {
-      throw new Error(data.error || 'Unknown error');
+      return callback(new Error(data.error || 'Unknown error'));
     }
 
-    return {
+    callback(null, {
       plantName: data.suggestions[0]?.plant_name || 'Unknown',
       disease: data.suggestions[0]?.disease || 'Unknown',
       confidence: data.suggestions[0]?.confidence || 'N/A',
       additionalInfo: data.suggestions[0]?.additional_info || 'No additional info available'
-    };
-  } catch (error) {
+    });
+  })
+  .catch(error => {
     console.error('Error calling Plant.id API:', error.message || error);
-    return { error: 'Error calling Plant.id API' };
-  }
+    callback(new Error('Error calling Plant.id API'));
+  });
 };
 
 app.listen(port, () => {
